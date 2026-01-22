@@ -16,6 +16,11 @@ public class GaleShapley {
 		
 		readResidents(residentsFilename);
 		readPrograms(programsFilename);
+
+		// KB - Write algorithm here?
+		System.out.println(residents.get(616));
+		System.out.println(programs.get("OBG"));
+
 	}
 	
 	// Reads the residents csv file
@@ -186,8 +191,9 @@ public class GaleShapley {
 			
 			GaleShapley gs= new GaleShapley(args[0],args[1]);
 			
-			System.out.println(gs.residents);
-			System.out.println(gs.programs);
+			// KB - TO BE REVERTED!
+			//System.out.println(gs.residents);
+			//System.out.println(gs.programs);
 			
         } catch (Exception e) {
             System.err.println("Error reading the file: " + e.getMessage());
