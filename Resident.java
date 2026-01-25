@@ -43,7 +43,13 @@ public class Resident {
 	public String getMatchedProgram() {
 		return this.matchedProgram;
 	}
-	
+
+	//added getter for residentID
+	public int getResidentID() {
+		return this.residentID;
+	}
+
+
 	// string representation
 	public String toString() {
       
