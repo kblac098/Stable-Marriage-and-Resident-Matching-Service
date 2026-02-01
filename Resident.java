@@ -11,7 +11,7 @@ public class Resident {
 	private String[] rol;
 	private int matchedRank;
 	private String matchedProgram;
-	private int rankIndex;
+	private int rankIndex; //tracks which program on applicants preference list they are currently proposing to
 	
 	// constructs a Resident
     public Resident(int id, String fname, String lname) {
@@ -69,7 +69,7 @@ public class Resident {
 		if (rol != null && rankIndex < rol.length) {
 			return rol[rankIndex++];
 		}
-		return null;//no mmore programs left to try.
+		return null;//no mmore programs on the residents list.
 	}
 
 	// string representation

@@ -193,14 +193,22 @@ public class GaleShapley {
 		return count;
 	}
 
-	public int vacancies() {
-		int totalVacancies = 0;
+	public int positionsAvailable() {
+		int totalpositionsAvailable = 0;
 		for (Program p : programs.values()) {
-			totalVacancies += (p.getQuota() - p.getMatchedResidents().size());
+			totalpositionsAvailable += (p.getQuota() - p.getMatchedResidents().size());
 		}
-		return totalVacancies;
+		return totalpositionsAvailable;
 	}
 
+	/**
+	 * The while loop works as follows:
+	 * while the queue is not empty the first resident is popped to propose to their next preference
+	 * if the resident is not on the programs preference list then they are added back to the queue to try their next choice.
+	 * if program has space then resident is accepted and status is updated.
+	 * if program is full then it compares the applicant to its current least preferred resident.
+	 * Loop ends when no more residents can make proposals.
+	 */
 	public void galeShapley() {
 
 		Queue<Resident> available = new LinkedList<>();
@@ -265,7 +273,7 @@ public class GaleShapley {
 			}
 
 			writer.println("Number of unmatched residents: " + unmatchedResidents());
-    		writer.println("Number of positions available: " + vacancies());
+    		writer.println("Number of positions available: " + positionsAvailable());
     		writer.close();
 		}
 
