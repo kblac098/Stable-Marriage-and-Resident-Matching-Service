@@ -3,6 +3,7 @@
 // Robert Laganiere, uottawa.ca
 import java.io.*;
 import java.util.HashMap;
+import java.util.ArrayList;
 
 // this is the (incomplete) class that will generate the resident and program maps
 public class GaleShapley {
@@ -11,18 +12,97 @@ public class GaleShapley {
 	public HashMap<String,Program> programs;
 	
 
-	public GaleShapley(String residentsFilename, String programsFilename) throws IOException, 
-													NumberFormatException {
-		
-		readResidents(residentsFilename);
-		readPrograms(programsFilename);
+public GaleShapley(String residentsFilename, String programsFilename)
+        throws IOException, NumberFormatException {
 
-		// KB - Write algorithm here?
-		System.out.println(residents.get(616));
-		System.out.println(programs.get("OBG"));
+    readResidents(residentsFilename);
+    readPrograms(programsFilename);
 
-	}
-	
+    ArrayList<String> matches = new ArrayList<>();
+    ArrayList<String> unmatched = new ArrayList<>();
+
+    // free residents queue
+    ArrayList<Resident> free = new ArrayList<>(residents.values());
+
+    while (!free.isEmpty()) {
+
+        Resident r = free.remove(0);
+        String pid = r.proposeNextProgram();
+
+        // resident exhausted all options
+        if (pid == null) {
+            unmatched.add(r.toString());
+            continue;
+        }
+
+        Program p = programs.get(pid);
+
+        // program does not exist → try next
+        if (p == null) {
+            free.add(r);
+            continue;
+        }
+
+        int rid = r.getID();
+
+        // program does NOT rank resident → reject
+        if (!p.ranks(rid)) {
+            free.add(r);
+            continue;
+        }
+
+        // program has space
+        if (p.hasSpace()) {
+            p.addResident(rid);
+            r.setMatchedProgram(pid);
+        } 
+        else {
+            int worst = p.getWorstMatchedResident();
+
+            // program prefers new resident
+            if (p.prefers(rid, worst)) {
+
+                p.removeResident(worst);
+                residents.get(worst).setMatchedProgram(null);
+                free.add(residents.get(worst));
+
+                p.addResident(rid);
+                r.setMatchedProgram(pid);
+
+            } else {
+                // rejected → resident remains free
+                free.add(r);
+            }
+        }
+    }
+
+    // build output
+    for (Resident r : residents.values()) {
+        if (r.getMatchedProgram() != null) {
+            matches.add(r + " -> " + r.getMatchedProgram());
+        }
+    }
+
+    BufferedWriter writer = new BufferedWriter(new FileWriter("matches.txt"));
+
+    writer.write("MATCHES\n");
+    for (String m : matches) {
+        writer.write(m);
+        writer.newLine();
+    }
+
+    writer.newLine();
+    writer.write("UNMATCHED\n");
+    for (String u : unmatched) {
+        writer.write(u);
+        writer.newLine();
+    }
+
+    writer.close();
+}
+
+
+
 	// Reads the residents csv file
 	// It populates the residents HashMap
     public void readResidents(String residentsFilename) throws IOException, 
@@ -191,9 +271,8 @@ public class GaleShapley {
 			
 			GaleShapley gs= new GaleShapley(args[0],args[1]);
 			
-			// KB - TO BE REVERTED!
-			//System.out.println(gs.residents);
-			//System.out.println(gs.programs);
+			System.out.println(gs.residents);
+			System.out.println(gs.programs);
 			
         } catch (Exception e) {
             System.err.println("Error reading the file: " + e.getMessage());

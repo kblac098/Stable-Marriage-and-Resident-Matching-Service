@@ -11,6 +11,7 @@ public class Resident {
 	private String[] rol;
 	private int matchedRank;
 	private String matchedProgram;
+	private int nextProposalIndex;
 	
 	// constructs a Resident
     public Resident(int id, String fname, String lname) {
@@ -20,6 +21,7 @@ public class Resident {
 		lastname= lname;
 		matchedRank = 0;
 		matchedProgram = null;
+		nextProposalIndex = 0;
 	}
 
     // the rol in order of preference
@@ -43,7 +45,16 @@ public class Resident {
 	public String getMatchedProgram() {
 		return this.matchedProgram;
 	}
-	
+
+	public int getID() {
+		return this.residentID;
+	}
+
+	public String proposeNextProgram() {
+	    if (nextProposalIndex >= rol.length) return null;
+	    return rol[nextProposalIndex++]; // increment here
+	}
+
 	// string representation
 	public String toString() {
       
