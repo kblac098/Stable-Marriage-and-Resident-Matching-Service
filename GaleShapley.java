@@ -83,20 +83,63 @@ public GaleShapley(String residentsFilename, String programsFilename)
         }
     }
 
-    BufferedWriter writer = new BufferedWriter(new FileWriter("matches.txt"));
+	ArrayList<Resident> all = new ArrayList<>(residents.values());
 
-    writer.write("MATCHES\n");
-    for (String m : matches) {
-        writer.write(m);
-        writer.newLine();
-    }
+	// sort by last name, then first name
+	all.sort((a, b) -> {
+	    int last = a.getLastname().compareTo(b.getLastname());
+	    if (last != 0) return last;
+	    return a.getFirstname().compareTo(b.getFirstname());
+	});
 
-    writer.newLine();
-    writer.write("UNMATCHED\n");
-    for (String u : unmatched) {
-        writer.write(u);
-        writer.newLine();
-    }
+    BufferedWriter writer = new BufferedWriter(new FileWriter("stable_match.txt"));
+
+	writer.write("lastname,firstname,residentID,programID,name");
+	writer.newLine();
+
+	int unmatchedCount = 0;
+	int matchedCount = 0;
+
+	for (Resident r : all) {
+
+	    String lastname  = r.getLastname();
+	    String firstname = r.getFirstname();
+	    int id = r.getID();
+
+	    if (r.getMatchedProgram() == null) {
+	        unmatchedCount++;
+	        writer.write(
+	            lastname + "," +
+	            firstname + "," +
+	            id + ",XXX,NOT_MATCHED"
+	        );
+	    } else {
+	        Program p = programs.get(r.getMatchedProgram());
+	        matchedCount++;
+	        writer.write(
+	            lastname + "," +
+	            firstname + "," +
+	            id + "," +
+	            p.getID() + "," +
+	            p.getName()
+	        );
+	    }
+	    writer.newLine();
+	}
+	writer.newLine();
+
+	// compute total available positions
+	int totalQuota = 0;
+	for (Program p : programs.values()) {
+	    totalQuota += p.getQuota();
+	}
+
+	int positionsAvailable = totalQuota - matchedCount;
+
+	// summary lines
+	writer.write("Number of unmatched residents: " + unmatchedCount);
+	writer.newLine();
+	writer.write("Number of positions available: " + positionsAvailable);
 
     writer.close();
 }

@@ -68,6 +68,7 @@ public class Program {
 	}
 
 	public String getID() { return programID; }
+	public String getName() { return name; }
 	public int getQuota() { return quota; }
 	public int[] getROL() { return rol; }
 	

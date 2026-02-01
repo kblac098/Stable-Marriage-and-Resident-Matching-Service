@@ -55,6 +55,10 @@ public class Resident {
 	    return rol[nextProposalIndex++]; // increment here
 	}
 
+	public String getFirstname() { return firstname; }
+	public String getLastname()  { return lastname; }
+
+
 	// string representation
 	public String toString() {
       
