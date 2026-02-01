@@ -35,6 +35,18 @@ public class Program {
 		return rank(residentID) != -1;
 	}
 
+	public String getName() {
+		return this.name;
+	}
+
+	public int getQuota() {
+		return quota;
+	}
+
+	public ArrayList getMatchedResidents() {
+		return matchedResidents;
+	}
+
 	//* this return the rank (index) of any resident in the program ROL
 	// Residents with a lower rank have a higher priority. */`
 	public int rank(int residentID) {
@@ -65,26 +77,32 @@ public class Program {
 	public void addResident(Resident r) {
 		if (matchedResidents.size() < quota) {
 			matchedResidents.add(r);
-			r.setMatchedProgram(programID);
+			r.setMatchedProgram(this.programID);
 			r.setMatchedRank(rank(r.getResidentID()));
 			return;
 		}
 
-		//case 2. the program is full so the code will compare preferences
+		//case 2. the program is full so the code will find the worst current match
 
 		Resident worst = leastPreferred();
 
+		//swap if the new resident is preferred over the worst ranked resident.
 		if (rank(r.getResidentID()) < rank(worst.getResidentID())) {
+			
 			//remove the worst resident
-
 			matchedResidents.remove(worst);
 			worst.setMatchedProgram(null);
+
+			//this makes sure the worst resident that got bumped out is made available again.
+			worst.setMatchedRank(-1);
+			
+			//add new resident
+			matchedResidents.add(r);
+			r.setMatchedProgram(programID);
+			r.setMatchedRank(rank(r.getResidentID()));
 		}
 
-		//add new resident
-		matchedResidents.add(r);
-		r.setMatchedProgram(programID);
-		r.setMatchedRank(rank(r.getResidentID()));
+		
 	}
 	
 	// string representation

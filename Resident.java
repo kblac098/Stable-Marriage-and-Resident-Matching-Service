@@ -11,6 +11,7 @@ public class Resident {
 	private String[] rol;
 	private int matchedRank;
 	private String matchedProgram;
+	private int rankIndex;
 	
 	// constructs a Resident
     public Resident(int id, String fname, String lname) {
@@ -20,6 +21,7 @@ public class Resident {
 		lastname= lname;
 		matchedRank = 0;
 		matchedProgram = null;
+		rankIndex = 0;
 	}
 
     // the rol in order of preference
@@ -49,10 +51,31 @@ public class Resident {
 		return this.residentID;
 	}
 
+	public String getFirstName() {
+		return this.firstname;
+	}
+
+	public String getLastName() {
+		return this.lastname;
+	}
+
+	//added getNextProgramID.
+	/**
+	 * Returns the next program ID in the resident's preference list
+	 * each call increments the counter so the next proposal goes to the next choice.
+	 */
+
+	public String getNextProgramID() {
+		if (rol != null && rankIndex < rol.length) {
+			return rol[rankIndex++];
+		}
+		return null;//no mmore programs left to try.
+	}
 
 	// string representation
 	public String toString() {
       
        return "["+residentID+"]: "+firstname+" "+ lastname+" ("+rol.length+")";	  
 	}
+
 }

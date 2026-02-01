@@ -2,7 +2,7 @@
 // Winter 2026
 // Robert Laganiere, uottawa.ca
 import java.io.*;
-import java.util.HashMap;
+import java.util.*;
 
 // this is the (incomplete) class that will generate the resident and program maps
 public class GaleShapley {
@@ -17,7 +17,6 @@ public class GaleShapley {
 		readResidents(residentsFilename);
 		readPrograms(programsFilename);
 
-		// KB - Write algorithm here?
 		System.out.println(residents.get(616));
 		System.out.println(programs.get("OBG"));
 
@@ -184,16 +183,105 @@ public class GaleShapley {
 		}	
     }
 
+	public int unmatchedResidents() {
+		int count = 0;
+		for (Resident r : residents.values()) {
+			if (r.getMatchedProgram() == null) {
+				count ++;
+			}
+		}
+		return count;
+	}
+
+	public int vacancies() {
+		int totalVacancies = 0;
+		for (Program p : programs.values()) {
+			totalVacancies += (p.getQuota() - p.getMatchedResidents().size());
+		}
+		return totalVacancies;
+	}
+
+	public void galeShapley() {
+
+		Queue<Resident> available = new LinkedList<>();
+
+		for (Resident r: residents.values()) {
+			available.add(r);
+		}
+
+
+		//this means the while loop will loop while there are still residents who can be matched.
+		while(!available.isEmpty()) {
+			Resident r = available.poll(); //pick the first available resident.
+
+			String nextProgramID = r.getNextProgramID();
+
+			if(nextProgramID != null) {
+				Program p = programs.get(nextProgramID);
+
+				if(p != null && p.member(r.getResidentID())) {
+					Resident leastBefore = p.leastPreferred();
+
+					p.addResident(r);
+
+					if (r.getMatchedProgram() == null) {
+						available.add(r);
+					}
+
+					else if (leastBefore != null && leastBefore.getMatchedProgram() == null) {
+						available.add(leastBefore);
+					}
+				} else {
+
+					available.add(r);
+				}
+			}
+
+		}
+	}
+
+	public void output(String results) throws IOException {
+			PrintWriter writer = new PrintWriter(new FileWriter(results));
+
+			ArrayList<Resident> rList = new ArrayList<>(residents.values());
+
+			Collections.sort(rList, new Comparator<Resident>() {
+				@Override
+				public int compare(Resident r1, Resident r2) {
+					return r1.getLastName().compareTo(r2.getLastName());
+				}
+			});
+
+			for (Resident r : rList) {
+				String programID = r.getMatchedProgram();
+				if (programID == null) {
+					writer.printf("%s, %s, %d, XXX, NOT_MATCHED%n",
+															r.getLastName(), r.getFirstName(), r.getResidentID());
+
+				} else {
+					Program p = programs.get(programID);
+					writer.printf("%s, %s, %d, %s, %s%n", r.getLastName(), r.getFirstName(), r.getResidentID(), p.getProgramID(), p.getName());
+				}
+			}
+
+			writer.println("Number of unmatched residents: " + unmatchedResidents());
+    		writer.println("Number of positions available: " + vacancies());
+    		writer.close();
+		}
+
 	public static void main(String[] args) {
-		
 		
 		try {
 			
 			GaleShapley gs= new GaleShapley(args[0],args[1]);
+			gs.galeShapley();
+
+			gs.output("matches.txt");
 			
-			// KB - TO BE REVERTED!
-			//System.out.println(gs.residents);
-			//System.out.println(gs.programs);
+			System.out.println("Matching Successful. Results saved to matches.txt");
+			
+			System.out.println(gs.residents);
+			System.out.println(gs.programs);
 			
         } catch (Exception e) {
             System.err.println("Error reading the file: " + e.getMessage());
