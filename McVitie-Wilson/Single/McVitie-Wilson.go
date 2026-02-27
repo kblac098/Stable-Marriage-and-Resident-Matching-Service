@@ -1,3 +1,6 @@
+//Nassar Shakir, 300082867
+//Kobe Blackburn, 300235492
+
 package main
 
 import (
