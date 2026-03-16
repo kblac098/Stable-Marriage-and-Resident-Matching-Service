@@ -1,19 +1,25 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GaleShapley-rp.pl
 %
-% This program runs the Gale-Shapley stable matching algorithm for
-% residents and medical residency programs. Each resident has a list
-% of programs they'd prefer to go to, and each program has its own
-% ranking of residents plus a quota of available positions.
+% Runs the Gale-Shapley stable matching algorithm for
+% residents and residency programs. Each resident has
+% a preference list, and each program has its own ranking
+% and quota of available spots.
 %
-% The algorithm keeps letting residents "offer" themselves to programs
-% until the system settles down and nobody wants to move anymore.
-% Once that happens, we print the results both to the console and
-% to a file called rp.txt.
+% Residents "offer" themselves to programs one by one.
+% Programs accept residents if they have space, or swap
+% out their least preferred if the new one is better.
+% The process repeats until things settle down and nobody
+% wants to move anymore.
+%
+% Results are printed to the console and saved to rp.txt.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 :- discontiguous resident/3.
 :- discontiguous program/4.
-% These lines just tell Prolog not to complain if resident and program
-% facts appear in different parts of the file.
+:- dynamic rank_table/3.
+% These lines just tell Prolog to chill if facts appear in
+% different parts and allow us to dynamically store the rank table.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Residents
@@ -70,191 +76,170 @@ program(obg,"Obstetrics and Gynecology",3,[616,828,773,913]).
 program(mmi,"Microbiology",1,[574,517,226,913,377,126]).
 program(hep,"Hematological Pathology",2,[403,574,913,616,226]).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Precompute rank table
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% buildRankTable/0
+%
+% Builds rank_table(ProgramID, ResidentID, Rank) for fast lookup
+% This saves time when checking who’s least preferred.
+%
+% No parameters.
+
+buildRankTable :-
+    retractall(rank_table(_,_,_)),
+    forall(program(P,_,_,ROL),
+        (
+            nth1(Rank,ROL,RID),
+            assertz(rank_table(P,RID,Rank)),
+            fail
+        );
+        true
+    ).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rankInProgram
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % rankInProgram(+ResidentID, +ProgramID, -Rank)
 %
-% Determines the ranking position of a resident inside a program's
-% preference list.
+% Gives the rank of a resident in a program’s list quickly.
+% Uses the precomputed rank_table so we don’t have to scan lists.
 %
-% Parameters
-% ResidentID : ID of the resident being checked
-% ProgramID  : Program whose ranking list we are looking at
-% Rank       : Position of the resident in that program's ROL
-%
-% Example
-% rankInProgram(403,nrs,R).
-% R = 3
-%
-% Meaning the program ranked resident 403 as their 3rd choice.
+% ResidentID : ID of the resident we’re checking
+% ProgramID  : ID of the program
+% Rank       : position in the program’s ROL (1 is best)
 
-rankInProgram(RID,PID,Rank) :-
-    program(PID,_,_,ROL),
-    nth1(Rank,ROL,RID).
+rankInProgram(RID,PID,Rank) :- 
+    rank_table(PID,RID,Rank), !.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % leastPreferred
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % leastPreferred(+ProgramID, +ResidentList, -ResidentID, -Rank)
 %
-% Finds the least preferred resident currently matched to a program.
-% This is used when the program is already full and needs to decide
-% whether a new applicant should replace someone already there.
+% Finds the least liked resident in a program’s current matches.
+% Used when a program is full and has to decide if a new applicant
+% is better than someone already there.
 %
-% Parameters
-% ProgramID     : Program whose ranking list we use
-% ResidentList  : List of residents currently matched to the program
-% ResidentID    : The least preferred resident in that list
-% Rank          : The ranking position of that resident in the
-%                 program's ROL.
+% ProgramID   : program checking its residents
+% ResidentList: list of resident IDs currently matched
+% ResidentID  : ID of the least preferred resident
+% Rank        : rank of that resident in the program’s ROL
 
-leastPreferred(P,[H|T],Rid,Rank) :-
-    rankInProgram(H,P,R),
-    leastPreferredAux(T,P,H,R,Rid,Rank).
+leastPreferred(P,Residents,Rid,Rank) :-
+    Residents = [H|_],
+    rankInProgram(H,P,Rank0),
+    leastPreferredAux(Residents,P,H,Rank0,Rid,Rank).
 
-% leastPreferredAux(+RemainingResidents,+ProgramID,+CurrentWorst,
-%                   +CurrentRank,-FinalWorst,-FinalRank)
+% leastPreferredAux(+RemainingResidents, +ProgramID, +CurrentWorst,
+%                  +CurrentRank, -FinalWorst, -FinalRank)
 %
-% Helper predicate used by leastPreferred/4. It walks through the
-% list of residents and keeps track of the lowest ranked one.
+% Helper for leastPreferred. Walks the list and keeps track
+% of the lowest-ranked resident so far.
 
-leastPreferredAux([],_,Rid,Rank,Rid,Rank).
+leastPreferredAux([],_,CR,CRank,CR,CRank).
 leastPreferredAux([H|T],P,CR,CRank,Rid,Rank) :-
-    ( rankInProgram(H,P,R), R > CRank ->
-        NR = H, NRank = R
-    ;
-        NR = CR, NRank = CRank
-    ),
+    rankInProgram(H,P,RH),
+    ( RH > CRank -> NR = H, NRank = RH ; NR = CR, NRank = CRank ),
     leastPreferredAux(T,P,NR,NRank,Rid,Rank).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % matched
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % matched(+ResidentID, -ProgramID, +MatchSet)
 %
-% Checks whether a resident is currently matched to a program.
+% True if the resident is currently matched to a program.
 %
-% Parameters
-% ResidentID : Resident being checked
-% ProgramID  : Program they are matched to
-% MatchSet   : Current list of program-resident matches
-%
-% MatchSet structure example:
-% [match(nrs,[126,517,574]), match(obg,[616,773,828]), ...]
+% ResidentID : ID of resident to check
+% ProgramID  : program they’re matched to
+% MatchSet   : current program-resident matches
 
 matched(RID,PID,MS) :-
     member(match(PID,Residents),MS),
     member(RID,Residents), !.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % offer
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% offer(+ResidentID,+CurrentMatchSet,-NewMatchSet)
+% offer(+ResidentID, +CurrentMatchSet, -NewMatchSet)
 %
-% Main step of the Gale-Shapley algorithm. A resident attempts to
-% match with programs in their preference list until one accepts
-% them or they run out of options.
-%
-% Parameters
-% ResidentID      : Resident currently trying to match
-% CurrentMatchSet : Current set of program-resident matches
-% NewMatchSet     : Updated match set after the offer attempt
+% Main step of Gale-Shapley. Resident tries to get matched
+% with programs in their preference order until someone accepts.
 
-offer(RID,MS,MS) :-
-    matched(RID,_,MS), !.
-
+offer(RID,MS,MS) :- matched(RID,_,MS), !.
 offer(RID,MS,NewMS) :-
     resident(RID,_,Prefs),
     offerList(RID,Prefs,MS,NewMS).
 
-% offerList(+ResidentID,+ProgramList,+MatchSet,-NewMatchSet)
+% offerList(+ResidentID, +ProgramList, +MatchSet, -NewMatchSet)
 %
-% Walks through a resident's preference list and tries programs
-% one at a time until a match is found.
+% Walks through a resident’s preference list one by one
+% Tries to get in. Handles full programs and replacing
+% least preferred residents if necessary.
 
 offerList(_,[],MS,MS).
-
 offerList(R,[P|Rest],MS,NewMS) :-
-
-    program(P,_,_,ROL),
-
-    % Skip program if resident not in its ranking list
-    \+ member(R,ROL), !,
-    offerList(R,Rest,MS,NewMS).
-
-offerList(R,[P|Rest],MS,NewMS) :-
-
+    rank_table(P,R,_), !,
     select(match(P,Residents),MS,Others),
     program(P,_,Quota,_),
     length(Residents,L),
-
     (
-        % Program still has room
-        L < Quota ->
+        L < Quota ->  % room in program, just add resident
             append(Residents,[R],NewResidents),
             NewMS = [match(P,NewResidents)|Others]
-
-    ;
-
-        % Program is full, check if new resident is preferred
-        leastPreferred(P,Residents,Rid,RankOld),
-        rankInProgram(R,P,RankNew),
-
-        ( RankNew < RankOld ->
-
-            % Replace the worst resident
-            select(Rid,Residents,Remaining),
-            append(Remaining,[R],Updated),
-            TempMS = [match(P,Updated)|Others],
-
-            offer(Rid,TempMS,NewMS)
-
         ;
-
-            % Try next program in resident list
-            offerList(R,Rest,MS,NewMS)
-        )
+            % program full, see if new resident is better
+            leastPreferred(P,Residents,Rid,RankOld),
+            rankInProgram(R,P,RankNew),
+            ( RankNew < RankOld ->
+                select(Rid,Residents,Remaining),
+                append(Remaining,[R],Updated),
+                TempMS = [match(P,Updated)|Others],
+                offer(Rid,TempMS,NewMS)
+            ;
+                offerList(R,Rest,MS,NewMS)
+            )
     ).
+offerList(R,[_|Rest],MS,NewMS) :-
+    offerList(R,Rest,MS,NewMS).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Gale-Shapley iteration
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% galeLoop(+ResidentList,+CurrentMatchSet,-NewMatchSet)
+% galeLoop(+ResidentList, +CurrentMatchSet, -NewMatchSet)
 %
-% Processes one round of offers for every resident.
+% Goes through all residents once, letting them offer themselves
+% to programs in order.
 
 galeLoop([],MS,MS).
 galeLoop([R|Rest],MS,Final) :-
     offer(R,MS,NewMS),
     galeLoop(Rest,NewMS,Final).
 
-% galeFixpoint(+Residents,+MatchSet,-FinalMatchSet)
+% galeFixpoint(+Residents, +MatchSet, -FinalMatchSet)
 %
-% Repeatedly runs galeLoop until the match set stops changing.
-% When no further changes occur, the matching is stable.
+% Keeps running galeLoop until the matches stop changing.
+% That’s when the matching is stable.
 
 galeFixpoint(Residents,MS,Final) :-
     galeLoop(Residents,MS,NewMS),
-    ( MS = NewMS ->
-        Final = MS
-    ;
-        galeFixpoint(Residents,NewMS,Final)
+    ( MS = NewMS -> Final = MS
+    ; galeFixpoint(Residents,NewMS,Final)
     ).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Printing helpers
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% writeMatch(+ResidentID,+ProgramID,+Stream)
+% writeMatch(+ResidentID, +ProgramID, +Stream)
 %
-% Prints one successful resident-program match to the
-% output file and the console.
+% Print a successful resident-program match to file and console.
 
 writeMatch(R,P,Stream) :-
     resident(R,name(FN,LN),_),
@@ -262,82 +247,67 @@ writeMatch(R,P,Stream) :-
     format(Stream,'~w,~w,~w,~w,~w~n',[LN,FN,R,P,Title]),
     format('~w,~w,~w,~w,~w~n',[LN,FN,R,P,Title]).
 
-% writeUnmatched(+ResidentID,+Stream)
+% writeUnmatched(+ResidentID, +Stream)
 %
-% Prints a resident who did not match any program.
+% Print a resident that didn’t match anywhere.
 
 writeUnmatched(R,Stream) :-
     resident(R,name(FN,LN),_),
     format(Stream,'~w,~w,~w,XXX,NOT_MATCHED~n',[LN,FN,R]),
     format('~w,~w,~w,XXX,NOT_MATCHED~n',[LN,FN,R]).
 
-% printResidents(+ResidentList,+MatchSet,+Stream,+Acc,+FinalCount)
+% printResidents(+ResidentList, +MatchSet, +Stream, +Acc, -FinalCount)
 %
-% Prints the final match status for every resident and keeps
-% track of how many ended up unmatched.
+% Prints all residents and counts how many went unmatched.
 
 printResidents([],_,_,U,U).
 printResidents([R|Rest],MS,Stream,Acc,Final) :-
-    (
-        matched(R,P,MS) ->
-            writeMatch(R,P,Stream),
-            NewAcc = Acc
-        ;
-            writeUnmatched(R,Stream),
-            NewAcc is Acc + 1
-    ),
+    ( matched(R,P,MS) -> writeMatch(R,P,Stream), NewAcc=Acc
+    ; writeUnmatched(R,Stream), NewAcc is Acc+1 ),
     printResidents(Rest,MS,Stream,NewAcc,Final).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Available positions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% availablePositions(+MatchSet,-TotalOpenPositions)
+% availablePositions(+MatchSet, -TotalOpenPositions)
 %
-% Counts how many residency spots remain unfilled after the
-% matching process finishes.
+% Counts how many spots are left unfilled after matching.
 
 availablePositions([],0).
 availablePositions([match(P,Rs)|Rest],Total) :-
     program(P,_,Quota,_),
     length(Rs,L),
-    Rem is Quota - L,
+    Rem is Quota-L,
     availablePositions(Rest,T2),
-    Total is Rem + T2.
+    Total is Rem+T2.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Top-level predicate
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% gale_shapley
+% gale_shapley/0
 %
-% Main entry point of the program.
+% Runs the whole matching thing from start to finish.
 % Steps:
-% 1. Build an empty match set for all programs
-% 2. Collect and sort all residents
-% 3. Run Gale-Shapley until the matching stabilizes
-% 4. Print the final results
-% 5. Save them to rp.txt
+% 1. Build rank table
+% 2. Make empty matches for all programs
+% 3. Sort residents
+% 4. Run Gale-Shapley until stable
+% 5. Print results and save to rp.txt
 
 gale_shapley :-
-
+    buildRankTable,                % precompute ranks
     findall(match(P,[]),program(P,_,_,_),InitMS),
     findall(R,resident(R,_,_),Res),
     sort(Res,Residents),
-
     galeFixpoint(Residents,InitMS,FinalMS),
-
     open('rp.txt',write,Stream),
-
     printResidents(Residents,FinalMS,Stream,0,Unmatched),
     availablePositions(FinalMS,Avail),
-
     format(Stream,'Number of unmatched residents: ~w~n',[Unmatched]),
     format(Stream,'Number of positions available: ~w~n',[Avail]),
-
     format('Number of unmatched residents: ~w~n',[Unmatched]),
     format('Number of positions available: ~w~n',[Avail]),
-
     close(Stream),
-
     writeln('Results written to rp.txt').
