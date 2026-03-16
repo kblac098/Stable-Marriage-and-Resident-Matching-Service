@@ -1,0 +1,12 @@
+medrano,indie,126,nrs,Neurosurgery
+jarvis,zev,226,mmi,Microbiology
+tan,tom,377,XXX,NOT_MATCHED
+olson,aspyn,403,hep,Hematological Pathology
+frederick,rosalie,517,nrs,Neurosurgery
+williams,salvatore,574,nrs,Neurosurgery
+robert,laurent,616,obg,Obstetrics and Gynecology
+clown,marie,773,obg,Obstetrics and Gynecology
+tremmo,emma,828,obg,Obstetrics and Gynecology
+paquet,camille,913,hep,Hematological Pathology
+Number of unmatched residents: 1
+Number of positions available: 1
