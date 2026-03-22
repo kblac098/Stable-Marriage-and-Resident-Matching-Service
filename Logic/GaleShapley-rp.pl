@@ -302,7 +302,7 @@ gale_shapley :-
     findall(R,resident(R,_,_),Res),
     sort(Res,Residents),
     galeFixpoint(Residents,InitMS,FinalMS),
-    open('rp.txt',write,Stream),
+    open('output-rp.txt',write,Stream),
     printResidents(Residents,FinalMS,Stream,0,Unmatched),
     availablePositions(FinalMS,Avail),
     format(Stream,'Number of unmatched residents: ~w~n',[Unmatched]),
